@@ -2576,6 +2576,7 @@ class DBInterface(object):
         port_obj = None
         port_refs = fip_obj.get_virtual_machine_interface_refs()
 
+        all_ports = []
         for port_ref in port_refs or []:
             if memo_req:
                 try:
@@ -2598,8 +2599,20 @@ class DBInterface(object):
                 if interface_type == "right":
                     continue
 
-            port_id = port_ref['uuid']
-            break
+            all_ports.append(port_obj)
+
+        fixed_ip_address = fip_obj.get_floating_ip_fixed_ip_address()
+        if len(all_ports) > 1:
+            # check if we have a match on the fixed_ip_address
+            for port_obj in all_ports:
+               ip_list = [ ip_obj.get_instance_ip_address() for ip_obj in
+                           self._instance_ip_list(back_ref_id=[port_obj.uuid])]
+               if fixed_ip_address in ip_list:
+                  # exact match found, use this port_obj
+                  break
+
+        if port_obj:
+            port_id = port_obj.uuid
 
         if tenant_id and port_obj:
             port_net_id = port_obj.get_virtual_network_refs()[0]['uuid']
@@ -2641,8 +2654,7 @@ class DBInterface(object):
         fip_q_dict['floating_network_id'] = floating_net_id
         fip_q_dict['router_id'] = router_id
         fip_q_dict['port_id'] = port_id
-        fip_q_dict[
-            'fixed_ip_address'] = fip_obj.get_floating_ip_fixed_ip_address()
+        fip_q_dict['fixed_ip_address'] = fixed_ip_address
         if port_obj:
             fip_q_dict['status'] = constants.PORT_STATUS_ACTIVE
         else:
